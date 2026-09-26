@@ -14,6 +14,8 @@ usage() {
   echo "  $0 extend <email> [days]       Extend account (default: 365 days) + print reset link"
   echo "  $0 check                       Lock any accounts past their expiry date"
   echo "  $0 delete <email>              Permanently delete a user"
+  echo "  $0 invite <admin-email> [uses] [days-valid]"
+  echo "                                 Generate a group invitation link (default: 1 use, 7 days)"
   exit 1
 }
 
@@ -157,6 +159,39 @@ SQL
     touch "$EXPIRY_FILE"
     sed -i '' "/^${EMAIL} /d" "$EXPIRY_FILE"
     echo "Deleted: $EMAIL"
+    ;;
+
+  invite)
+    [[ $# -lt 2 ]] && usage
+    EMAIL="$2"
+    USES="${3:-1}"
+    DAYS="${4:-7}"
+    # Generate token + SHA-256 hash using python3
+    read -r RAW_TOKEN HEX_HASH < <(python3 -c "
+import os, base64, hashlib, uuid
+token = base64.b32encode(os.urandom(16)).decode().rstrip('=')
+h = hashlib.sha256(token.encode()).hexdigest()
+print(token, h)
+")
+    EXPIRES=$(date -v "+${DAYS}d" "+%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || date -d "+${DAYS} days" "+%Y-%m-%dT%H:%M:%SZ")
+    NOW=$(date -u "+%Y-%m-%dT%H:%M:%SZ")
+    TOKEN_ID=$(python3 -c "import uuid; print(uuid.uuid4())")
+    sqlite_script <<SQL
+PRAGMA foreign_keys = ON;
+INSERT INTO group_invitation_tokens (id, created_at, updated_at, token, expires_at, uses, group_invitation_tokens)
+SELECT
+  '${TOKEN_ID}', '${NOW}', '${NOW}',
+  X'${HEX_HASH}',
+  '${EXPIRES}',
+  ${USES},
+  ug.group_id
+FROM user_groups ug
+JOIN users u ON u.id = ug.user_id
+WHERE u.email = '${EMAIL}' AND ug.role = 'owner'
+LIMIT 1;
+SQL
+    echo "Invite link (valid ${DAYS} days, ${USES} use(s)):"
+    echo "  http://localhost:3100/?token=${RAW_TOKEN}"
     ;;
 
   *)
