@@ -13,6 +13,7 @@ usage() {
   echo "  $0 expire <email>              Lock account now"
   echo "  $0 extend <email> [days]       Extend account (default: 365 days) + print reset link"
   echo "  $0 check                       Lock any accounts past their expiry date"
+  echo "  $0 delete <email>              Permanently delete a user"
   exit 1
 }
 
@@ -128,6 +129,19 @@ case "$1" in
       fi
     done < "$EXPIRY_FILE"
     echo "Check complete."
+    ;;
+
+  delete)
+    [[ $# -lt 2 ]] && usage
+    EMAIL="$2"
+    # Confirm before deleting
+    read -r -p "Permanently delete '$EMAIL'? This cannot be undone. [y/N] " confirm
+    [[ "$confirm" != "y" && "$confirm" != "Y" ]] && echo "Aborted." && exit 0
+    sqlite_exec "DELETE FROM users WHERE email = '${EMAIL}'"
+    # Remove from expiry tracking
+    touch "$EXPIRY_FILE"
+    sed -i '' "/^${EMAIL} /d" "$EXPIRY_FILE"
+    echo "Deleted: $EMAIL"
     ;;
 
   *)

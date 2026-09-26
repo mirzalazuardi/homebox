@@ -116,6 +116,14 @@ Send this link to the user to let them set a new password.
 Prefix the link with `http://localhost:3100` and send it to the user.
 They use it to set a new password and regain access.
 
+### Delete a user permanently
+
+```bash
+./manage-user.sh delete jane@example.com
+```
+
+Prompts for confirmation before deleting. Removes the user from the database and from expiry tracking. The user's group and inventory data are **not** deleted — only the account is removed.
+
 ### Auto-lock expired accounts
 
 ```bash
