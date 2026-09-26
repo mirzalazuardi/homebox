@@ -124,6 +124,25 @@ They use it to set a new password and regain access.
 
 Prompts for confirmation before deleting. Removes the user, their group, and all associated data (items, tags, attachments, maintenance entries). If the user was a member of a shared group they didn't own, the group is left intact — only their membership is removed.
 
+### Invite someone to join your group
+
+```bash
+# Default: 1 use, 7 days valid
+./manage-user.sh invite mirzalazuardi@gmail.com
+
+# Custom uses and expiry
+./manage-user.sh invite mirzalazuardi@gmail.com 3 30
+```
+
+Prints a ready-to-send link:
+
+```
+Invite link (valid 7 days, 1 use(s)):
+  http://localhost:3100/?token=J5VKTGJBLCOFDRJMKQTVZLW35A
+```
+
+Send the link to the person — they open it, register, and join your group. No password required from you.
+
 ### Auto-lock expired accounts
 
 ```bash
