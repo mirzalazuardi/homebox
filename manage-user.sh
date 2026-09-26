@@ -24,6 +24,12 @@ sqlite_exec() {
     "apk add -q sqlite 2>/dev/null && sqlite3 /data/homebox.db \"$1\""
 }
 
+# Pipe a multi-statement SQL script into sqlite3
+sqlite_script() {
+  docker run --rm -i -v "$VOLUME:/data" alpine sh -c \
+    "apk add -q sqlite 2>/dev/null && sqlite3 /data/homebox.db"
+}
+
 lock_account() {
   local email="$1"
   sqlite_exec "UPDATE users SET password = 'LOCKED' WHERE email = '${email}'"
@@ -134,10 +140,19 @@ case "$1" in
   delete)
     [[ $# -lt 2 ]] && usage
     EMAIL="$2"
-    # Confirm before deleting
-    read -r -p "Permanently delete '$EMAIL'? This cannot be undone. [y/N] " confirm
+    read -r -p "Permanently delete '$EMAIL' and all their data? This cannot be undone. [y/N] " confirm
     [[ "$confirm" != "y" && "$confirm" != "Y" ]] && echo "Aborted." && exit 0
-    sqlite_exec "DELETE FROM users WHERE email = '${EMAIL}'"
+    sqlite_script <<SQL
+PRAGMA foreign_keys = ON;
+-- Delete groups where this user is the sole member (their own inventory)
+DELETE FROM groups WHERE id IN (
+  SELECT ug.group_id FROM user_groups ug
+  WHERE ug.user_id = (SELECT id FROM users WHERE email = '${EMAIL}')
+  AND (SELECT COUNT(*) FROM user_groups WHERE group_id = ug.group_id) = 1
+);
+-- Delete the user (cascades: auth_tokens, api_keys, notifiers, user_groups)
+DELETE FROM users WHERE email = '${EMAIL}';
+SQL
     # Remove from expiry tracking
     touch "$EXPIRY_FILE"
     sed -i '' "/^${EMAIL} /d" "$EXPIRY_FILE"
