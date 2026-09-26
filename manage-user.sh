@@ -7,9 +7,11 @@ CONTAINER="mrzlzrd_homebox-homebox-1"
 
 usage() {
   echo "Usage:"
+  echo "  $0 list                        List all users in the database"
+  echo "  $0 status                      List tracked users with expiry state"
+  echo "  $0 near-expiry [days]          Show users expiring within N days (default: 30)"
   echo "  $0 expire <email>              Lock account now"
   echo "  $0 extend <email> [days]       Extend account (default: 365 days) + print reset link"
-  echo "  $0 status                      List all tracked users and their expiry"
   echo "  $0 check                       Lock any accounts past their expiry date"
   exit 1
 }
@@ -57,6 +59,33 @@ get_expiry() {
 }
 
 case "$1" in
+  list)
+    printf "%-30s %-40s %s\n" "NAME" "EMAIL" "EXPIRY"
+    printf "%-30s %-40s %s\n" "----" "-----" "------"
+    touch "$EXPIRY_FILE"
+    while IFS='|' read -r name email; do
+      expiry=$(grep "^${email} " "$EXPIRY_FILE" | awk '{print $2}' || true)
+      [[ -z "$expiry" ]] && expiry="none"
+      printf "%-30s %-40s %s\n" "$name" "$email" "$expiry"
+    done < <(docker run --rm -v "$VOLUME:/data" alpine sh -c \
+      "apk add -q sqlite 2>/dev/null && sqlite3 /data/homebox.db 'SELECT name, email FROM users ORDER BY name'" 2>/dev/null)
+    ;;
+
+  near-expiry)
+    DAYS="${2:-30}"
+    THRESHOLD=$(date -v "+${DAYS}d" "+%Y-%m-%d" 2>/dev/null || date -d "+${DAYS} days" "+%Y-%m-%d")
+    TODAY=$(date "+%Y-%m-%d")
+    touch "$EXPIRY_FILE"
+    printf "%-35s %-12s %s\n" "EMAIL" "EXPIRY" "DAYS LEFT"
+    printf "%-35s %-12s %s\n" "-----" "------" "---------"
+    while read -r email expiry; do
+      if [[ "$expiry" > "$TODAY" ]] && ! [[ "$expiry" > "$THRESHOLD" ]]; then
+        days_left=$(( ( $(date -j -f "%Y-%m-%d" "$expiry" "+%s" 2>/dev/null || date -d "$expiry" "+%s") - $(date "+%s") ) / 86400 ))
+        printf "%-35s %-12s %s\n" "$email" "$expiry" "${days_left}d"
+      fi
+    done < "$EXPIRY_FILE"
+    ;;
+
   expire)
     [[ $# -lt 2 ]] && usage
     lock_account "$2"

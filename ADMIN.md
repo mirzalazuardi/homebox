@@ -43,7 +43,37 @@ The script will:
 
 ## Managing Account Expiry
 
-### Check all users and their status
+### List all users in the database
+
+```bash
+./manage-user.sh list
+```
+
+```
+NAME                           EMAIL                                    EXPIRY
+----                           -----                                    ------
+Bob Smith                      bob@example.com                          2027-09-26
+Jane Doe                       jane@example.com                         none
+Mirzalazuardi Hermawan         mirzalazuardi@gmail.com                  none
+```
+
+### Show users expiring soon
+
+```bash
+# Default: within 30 days
+./manage-user.sh near-expiry
+
+# Custom window
+./manage-user.sh near-expiry 60
+```
+
+```
+EMAIL                               EXPIRY       DAYS LEFT
+-----                               ------       ---------
+bob@example.com                     2027-09-26   14d
+```
+
+### Check all tracked users and their status
 
 ```bash
 ./manage-user.sh status
