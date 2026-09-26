@@ -122,7 +122,7 @@ They use it to set a new password and regain access.
 ./manage-user.sh delete jane@example.com
 ```
 
-Prompts for confirmation before deleting. Removes the user from the database and from expiry tracking. The user's group and inventory data are **not** deleted — only the account is removed.
+Prompts for confirmation before deleting. Removes the user, their group, and all associated data (items, tags, attachments, maintenance entries). If the user was a member of a shared group they didn't own, the group is left intact — only their membership is removed.
 
 ### Auto-lock expired accounts
 
